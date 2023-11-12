@@ -1,0 +1,93 @@
+--------------------------------TEMA 2-----------------------------------------
+Dascalu Stefan Teodor
+
+Implementare conexiuni:
+
+SERVER:
+
+    Serverul parseaza portul primit ca argument in linia de comanda si il salveaza
+pentru utilizarea la creearea urmatoarelor conexiuni.
+    Creem doi file descriptori, unul pentru ascultarea tcp si unul pentru clientii
+udp, si ii utilizam pentru a deschide socketii TCP si UDP, in caz de eroare
+serverul afiseaza mesajul [SERVER ERR] Could not create TCP/UDP socket. 
+Urmeaza sa dam bind pe ip:INADDR_ANY(0.0.0.0) si port, pentru ambii socketi,
+iar in caz de eroare afisam mesajul [SERVER ERR] Could not bind TCP/UDP socket.
+    Ascultam pe socketul TCP pentru noi conexiuni.
+    Ne instantiem vectorul de poll pe care salvam STDIN, tcpfd si udpfd si
+descriptorii urmatorilor clienti ca si POLLIN(verificam daca primim mesaje de citit).
+    0 - TCP
+    1 - UDP
+    2 - STDIN
+Folosim poll pentru a nu bloca serverul cu apelurile blocante read/scanf/recv.
+    Cat timp serverul este deschis:
+    - apelam poll pentru a verifica daca fd-urile au fost modificate
+    - verificam daca pe tcp am primit un connect si il acceptam, creand
+      inca un fd in poll pentru clientul acceptat
+Daca serverul primeste mesajul "id CLIENT_ID" verifica daca exista deja un
+client cu acelasi id si in caz ca exista serverul inchide clientul duplicat,
+atat si conexiunile cu acesta. Daca nu este duplicat, salvan descriptorul
+comunicatiei, id-ul si addresa intr-un vector de clienti.
+
+SUBSCRIBER:
+
+    Creeam un file descriptor pentru comunicarea cu serverul
+si il utilizam pentru creearea socketului, in caz de eroare se afiseaza mesajul
+[SUBSCRIBER ERR] Could not create TCP socket. Urmeaza sa trimitem o cerere de
+connect la server, care urmeaza sa fie acceptata pentru a realiza conexiunea
+cu serverul.
+    Clientul trimite pe server un mesaj de tipul "id CLIENT_ID".
+    Ne instantiem vectorul de poll pe care salvam STDIN si tcpfd
+ca si POLLIN(verificam daca primim mesaje de citit).
+    0 - STDIN
+    1 - TCP
+Folosim poll pentru a nu bloca serverul cu apelurile blocante read/scanf/recv.
+    Cat timp serverul este deschis:
+    - apelam poll pentru a verifica daca fd-urile au fost modificate
+
+Implementare functionalitate:
+
+SUBSCRIBE:
+    Clientul primeste de la tastatura comanda "subscribe topic SF" si trimite
+serverului informatia ca acest client doreste sa se aboneza la topic. Serverul
+preia id-ul clientului din vectorul de clienti si-l salveaza in vectorul de
+clienti abonati a topicului. Serverul utilizeaza doi vectori, unul pentru abonamente
+fara sf si unul pentru sf, care contin elemnte de structura noSF_topic care contine
+un camp topic(salveaza numele topicului) si clients(un vector care salveaza id-urile
+clientilor abonati la topic).
+    In final clientul afiseaza mesajul "Subscribed to topic."
+
+UNSUBSCRIBE:
+    Clientul primeste de la tastatura comanda "unsubscribe topic" si trimite
+serverului informatia ca acest client doreste sa se dezaboneza de la topic. Serverul
+preia id-ul clientului din vectorul de clienti si updateaza tabele de abonamente,
+eliminand id-ul clientului din cleintii abonati la topic
+
+EXIT client:
+    Clientul primeste de la tastatura comanda "exit" si transmite serverului
+ca acesta se va deconecta, astfel serverul il sterge din vectorii de clienti
+si socketul acestuia, fara a modifica abonamentele acelui client. In final,
+clientul inchide conexiunile si incheie procesul.
+
+EXIT server:
+    Serverul primeste de la tastatura comanda si trimite fiecarui client activ
+comanda exit care v-a forta clientul sa inchisa conexiunile si procesul, urmand
+ca serverul sa faca la fel.
+
+PRIMIRE MESAJ UDP CATRE SERVER:
+    In momentul primirii unui mesaj de la un client udp, serverul parseaza
+continutul mesajului intr-o structura ajutatoare udp_message.
+    Aceasta structura contine un string de 51 de octeti, un octet si un string
+de 1501 de caractere. Serverul salveaza topicul, type-ul si continutul, incarcandu-l
+in structura udp_message. Apoi serverul verifica toate abonamentele noSF si trimite
+structura la fiecare client abonat la topic
+    Apoi, serverul verifica tabela de SF si verifica abonatii conectati, daca clientul
+abonat SF la topic este activ, mesajul este transmis imediat, dar in caz ca clientul este
+inactiv mesajul este salvat intr-o tablea de sctuctura saved-message care contine id-ul clientului
+si mesajele salvate.
+    Cand clientul SF devine iar activa, serverul transmite toate mesajele salvate in vector si goleste acel
+vector de mesaje.
+
+
+    In partea clientului, in moment ce a primat de la serve un mesaj udp_mesaje salveaza structura si imparte
+campurile dupa tipurile de date primite, afisand mesale corespunzatoare.
+
